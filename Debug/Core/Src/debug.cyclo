@@ -1,3 +1,0 @@
-../Core/Src/debug.c:29:6:debug_print	7
-../Core/Src/debug.c:69:6:debug_process	4
-../Core/Src/debug.c:104:6:debug_tx_complete_callback	1

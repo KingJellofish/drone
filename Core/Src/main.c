@@ -20,7 +20,6 @@
 #include "main.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
-#include "debug.h"
 
 #include "ssd1306.h"
 #include "fonts.h"
@@ -118,6 +117,30 @@ HAL_StatusTypeDef accel_status;
 HAL_StatusTypeDef bar_status;
 HAL_StatusTypeDef gps_status;
 
+extern USBD_HandleTypeDef hUsbDeviceFS;
+
+void debug_print(const char* message) {
+  static uint8_t tx_buf[256];
+  USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
+  uint32_t start = HAL_GetTick();
+
+  if (hcdc == NULL) {
+    return;
+  }
+  while (hcdc->TxState != 0) {
+    if (HAL_GetTick() - start > 20) {
+      return;
+    }
+  }
+
+  size_t len = strlen(message);
+  if (len > sizeof(tx_buf)) {
+    len = sizeof(tx_buf);
+  }
+  memcpy(tx_buf, message, len);
+  CDC_Transmit_FS(tx_buf, (uint16_t)len);
+}
+
 HAL_StatusTypeDef BMP581_ReadPressure(uint8_t *data) {
   uint8_t tx[5] = {0x20 | 0x80, 0, 0, 0, 0};
   uint8_t rx[5] = {0};
@@ -162,16 +185,29 @@ HAL_StatusTypeDef BMP581_WriteRegister(uint8_t reg, uint8_t data) {
   return status;
 }
 
+volatile uint32_t gps_error_count = 0;
+volatile uint32_t gps_bytes_total = 0;
+
+static HAL_StatusTypeDef GPS_StartRx(void) {
+  HAL_StatusTypeDef status = HAL_UARTEx_ReceiveToIdle_DMA(&huart6, gps_rx_buffer, GPS_RX_BUFFER_SIZE);
+  __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
+  return status;
+}
+
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
   if (huart->Instance == USART6) {
     gps_rx_size = Size;
+    gps_bytes_total += Size;
     gps_rx_ready = 1;
   }
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
   if (huart->Instance == USART6) {
-    gps_uart_error = HAL_UART_GetError(huart);
+    // gps_uart_error = HAL_UART_GetError(huart);
+    gps_uart_error |= HAL_UART_GetError(huart);
+    gps_error_count++;
+    GPS_StartRx();
   }
 }
 
@@ -461,7 +497,7 @@ int main(void)
   /* CE is wired to PC1 in this project; high enables continuous RX. */
   // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
 
-  if (HAL_UARTEx_ReceiveToIdle_DMA(&huart6, gps_rx_buffer, GPS_RX_BUFFER_SIZE) != HAL_OK) {
+  if (GPS_StartRx() != HAL_OK) {
     debug_print("Receive to Idle DMA failed\r\n");
     Error_Handler();
   } else {
@@ -600,7 +636,7 @@ int main(void)
       debug_print("We are running!\r\n");
     }
     */
-    /*
+    
     if (gps_rx_ready) {
       uint16_t size;
 
@@ -614,20 +650,27 @@ int main(void)
       memcpy(buffer, gps_rx_buffer, size);
       buffer[size] = '\0';
 
+      GPS_StartRx();
+
       debug_print(buffer);
-
-      if (gps_uart_error != 0) {
-        char error_buffer[64];
-        snprintf(error_buffer, sizeof(error_buffer), "GPS Error: %" PRIu32 "\r\n", gps_uart_error);
-        debug_print(error_buffer);
-      }
-
-      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, gps_rx_buffer, GPS_RX_BUFFER_SIZE);
-      __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
-    } else {
-      debug_print("gps_rx_ready is not ready\r\n");
     }
-    */
+
+    static uint32_t last_status_tick = 0;
+    if (HAL_GetTick() - last_status_tick >= 1000) {
+      last_status_tick = HAL_GetTick();
+
+      uint32_t err_bits, err_count;
+      __disable_irq();
+      err_bits = gps_uart_error;
+      err_count = gps_error_count;
+      gps_uart_error = 0;
+      __enable_irq();
+
+      char status_buffer[96];
+      snprintf(status_buffer, sizeof(status_buffer), "\r\n[GPS] bytes:%" PRIu32 " | errors: %" PRIu32 " | last err bits: 0x%02" PRIX32 " | tx: %d\r\n", gps_bytes_total, err_count, err_bits, (int)gps_status);
+      debug_print(status_buffer);
+    }
+    
     /*
     HAL_StatusTypeDef status = HAL_UART_Receive(&huart6, &test_byte, 1, 1000);
 
@@ -655,8 +698,6 @@ int main(void)
 
     debug_print(debug_buffer);
     */
-
-    debug_process();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

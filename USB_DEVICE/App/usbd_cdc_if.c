@@ -20,7 +20,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_cdc_if.h"
-#include "debug.h"
 
 /* USER CODE BEGIN INCLUDE */
 
@@ -313,8 +312,6 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
   UNUSED(Len);
   UNUSED(epnum);
   /* USER CODE END 13 */
-
-  debug_tx_complete_callback();
 
   return result;
 }
