@@ -623,6 +623,7 @@ int main(void)
       }
 
       HAL_UARTEx_ReceiveToIdle_DMA(&huart6, gps_rx_buffer, GPS_RX_BUFFER_SIZE);
+      __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
     } else {
       debug_print("gps_rx_ready is not ready\r\n");
     }
