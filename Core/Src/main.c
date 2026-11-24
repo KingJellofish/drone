@@ -187,16 +187,22 @@ HAL_StatusTypeDef BMP581_WriteRegister(uint8_t reg, uint8_t data) {
 
 volatile uint32_t gps_error_count = 0;
 volatile uint32_t gps_bytes_total = 0;
+volatile uint16_t gps_last_rx_size = 0;
+volatile HAL_StatusTypeDef gps_rx_start_status = HAL_ERROR;
 
 static HAL_StatusTypeDef GPS_StartRx(void) {
   HAL_StatusTypeDef status = HAL_UARTEx_ReceiveToIdle_DMA(&huart6, gps_rx_buffer, GPS_RX_BUFFER_SIZE);
-  __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
+  if (status == HAL_OK) {
+    __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
+  }
+  gps_rx_start_status = status;
   return status;
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
   if (huart->Instance == USART6) {
     gps_rx_size = Size;
+    gps_last_rx_size = Size;
     gps_bytes_total += Size;
     gps_rx_ready = 1;
   }
@@ -666,8 +672,17 @@ int main(void)
       gps_uart_error = 0;
       __enable_irq();
 
-      char status_buffer[96];
-      snprintf(status_buffer, sizeof(status_buffer), "\r\n[GPS] bytes:%" PRIu32 " | errors: %" PRIu32 " | last err bits: 0x%02" PRIX32 " | tx: %d\r\n", gps_bytes_total, err_count, err_bits, (int)gps_status);
+      char status_buffer[160];
+      snprintf(status_buffer, sizeof(status_buffer),
+               "\r\n[GPS] bytes:%" PRIu32 " | errors:%" PRIu32
+               " err:0x%02" PRIX32 " | rx_start:%d uart_state:0x%02X"
+               " uart_err:0x%02" PRIX32 " dma_left:%lu last_chunk:%u tx:%d\r\n",
+               gps_bytes_total, err_count, err_bits,
+               (int)gps_rx_start_status,
+               (unsigned int)HAL_UART_GetState(&huart6),
+               (uint32_t)HAL_UART_GetError(&huart6),
+               (unsigned long)__HAL_DMA_GET_COUNTER(huart6.hdmarx),
+               (unsigned int)gps_last_rx_size, (int)gps_status);
       debug_print(status_buffer);
     }
     
