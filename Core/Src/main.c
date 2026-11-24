@@ -20,6 +20,7 @@
 #include "main.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
+#include "debug.h"
 
 #include "ssd1306.h"
 #include "fonts.h"
@@ -116,10 +117,6 @@ HAL_StatusTypeDef gyro_status;
 HAL_StatusTypeDef accel_status;
 HAL_StatusTypeDef bar_status;
 HAL_StatusTypeDef gps_status;
-
-void debug_print(const char* message) {
-  CDC_Transmit_FS((uint8_t*)message, strlen(message));
-}
 
 HAL_StatusTypeDef BMP581_ReadPressure(uint8_t *data) {
   uint8_t tx[5] = {0x20 | 0x80, 0, 0, 0, 0};
@@ -477,6 +474,7 @@ int main(void)
   //debug_print(buffer);
 
   debug_print("Hello world! Testing serial output.\r\n");
+  HAL_Delay(2000);
 
   /* USER CODE END 2 */
 
@@ -602,7 +600,7 @@ int main(void)
       debug_print("We are running!\r\n");
     }
     */
-    
+    /*
     if (gps_rx_ready) {
       uint16_t size;
 
@@ -629,7 +627,7 @@ int main(void)
     } else {
       debug_print("gps_rx_ready is not ready\r\n");
     }
-    
+    */
     /*
     HAL_StatusTypeDef status = HAL_UART_Receive(&huart6, &test_byte, 1, 1000);
 
@@ -658,7 +656,7 @@ int main(void)
     debug_print(debug_buffer);
     */
 
-    HAL_Delay(100);
+    debug_process();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

@@ -1,3 +1,4 @@
+"./Core/Src/debug.o"
 "./Core/Src/fonts.o"
 "./Core/Src/lis3mdl_reg.o"
 "./Core/Src/lsm6dsl_reg.o"
