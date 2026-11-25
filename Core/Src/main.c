@@ -502,7 +502,8 @@ int main(void)
 
   /* CE is wired to PC1 in this project; high enables continuous RX. */
   // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
-
+  
+  /*
   if (GPS_StartRx() != HAL_OK) {
     debug_print("Receive to Idle DMA failed\r\n");
     Error_Handler();
@@ -510,6 +511,7 @@ int main(void)
     debug_print("Receive to Idle DMA succeeded\r\n");
   }
   HAL_Delay(2000);
+  */
 
   //char buffer[128];
   //snprintf(buffer, sizeof(buffer), "Hello world! Testing serial output.\r\n");
@@ -642,7 +644,7 @@ int main(void)
       debug_print("We are running!\r\n");
     }
     */
-    
+    /*
     if (gps_rx_ready) {
       uint16_t size;
 
@@ -685,7 +687,28 @@ int main(void)
                (unsigned int)gps_last_rx_size, (int)gps_status);
       debug_print(status_buffer);
     }
+    */
     
+    uint8_t gps_byte;
+
+    HAL_StatusTypeDef status =
+        HAL_UART_Receive(&huart6, &gps_byte, 1, 1000);
+
+    if (status == HAL_OK)
+    {
+        char msg[16];
+        snprintf(msg, sizeof(msg), "%02X\r\n", gps_byte);
+        debug_print(msg);
+    }
+    else if (status == HAL_TIMEOUT)
+    {
+        debug_print("UART timeout\r\n");
+    }
+    else
+    {
+        debug_print("UART receive error\r\n");
+    }
+
     /*
     HAL_StatusTypeDef status = HAL_UART_Receive(&huart6, &test_byte, 1, 1000);
 
@@ -759,7 +782,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {
     Error_Handler();
   }
